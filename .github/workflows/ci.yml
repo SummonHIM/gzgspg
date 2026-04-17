@@ -1,4 +1,4 @@
-name: 'publish'
+name: 'ci'
 
 on:
   push:
@@ -38,6 +38,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+
+      - uses: pnpm/action-setup@v6
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
