@@ -58,8 +58,7 @@ jobs:
 
       - name: Install frontend dependencies
         run: |
-          pnpm approve-builds
-          pnpm install # change this to npm, pnpm or bun depending on which one you use.
+          pnpm install --frozen-lockfile
 
       - name: Build tauri application
         run: pnpn tauri build
