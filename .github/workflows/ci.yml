@@ -34,16 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: latest
-
       - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: pnpm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -59,10 +53,10 @@ jobs:
 
       - name: Install frontend dependencies
         run: |
-          pnpm install
+          yarn install
 
       - name: Build tauri application
-        run: pnpm tauri build
+        run: yarn tauri build
 
       - name: Upload arifacts
         uses: actions/upload-artifact@v4
