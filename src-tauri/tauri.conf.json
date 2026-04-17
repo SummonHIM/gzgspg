@@ -12,8 +12,8 @@
   "app": {
     "windows": [
       {
-        "title": "gzgspg",
-        "width": 800,
+        "title": "广工商校园网登陆器",
+        "width": 400,
         "height": 600
       }
     ],
