@@ -53,7 +53,7 @@ jobs:
 
       - name: Install frontend dependencies
         run: |
-          pnpm install --frozen-lockfile --ignore-scripts=false
+          pnpm install --frozen-lockfile
 
       - name: Tauri build and release
         uses: tauri-apps/tauri-action@v1

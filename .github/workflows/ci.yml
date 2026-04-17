@@ -59,7 +59,7 @@ jobs:
 
       - name: Install frontend dependencies
         run: |
-          pnpm install --frozen-lockfile --ignore-scripts=false
+          pnpm install
 
       - name: Build tauri application
         run: pnpm tauri build
