@@ -45,7 +45,8 @@ foreach ($s in $scopes) {
     Set-Content -LiteralPath $tmpWxs -Value $wxs -Encoding UTF8
 
     $out = Join-Path $OutDir "gzgspg-windows-$Arch-$Version-$($s.Name).msi"
-    wix build -arch $wixArch -o $out $tmpWxs
+    # WiX v7 强制接受 OSMF EULA，否则报 WIX7015；-acceptEula wix7 在构建脚本内直接接受。
+    wix build -acceptEula wix7 -arch $wixArch -o $out $tmpWxs
     if (-not $?) { throw "wix build failed for scope $($s.Name)" }
 
     Remove-Item -LiteralPath $tmpWxs -Force

@@ -98,14 +98,14 @@ jobs:
 
       - name: Install LLVM-MinGW
         if: matrix.jobs.goos == 'windows'
-        shell: bash
+        shell: pwsh
         run: |
-          set -xeuo pipefail
-          # windows-latest 自带的 mingw 只有 x86_64，编不了 386/arm64；用 LLVM-MinGW 一套覆盖三个架构。
-          curl -fsSL -o "$RUNNER_TEMP/llvm-mingw.zip" \
-            "https://github.com/mstorsjo/llvm-mingw/releases/download/20260908/llvm-mingw-20260908-ucrt-x86_64.zip"
-          "/c/Program Files/7-Zip/7z.exe" x "$RUNNER_TEMP/llvm-mingw.zip" -o"$RUNNER_TEMP/llvm-mingw" -y
-          echo "$RUNNER_TEMP/llvm-mingw/llvm-mingw-20260908-ucrt-x86_64/bin" >> "$GITHUB_PATH"
+          # windows-latest 自带的 mingw 只有 x86_64，编不了 386/arm64；用包的 mstorsjo llvm-mingw 一套覆盖三个架构。
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          scoop install mingw-mstorsjo-llvm-ucrt
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "$env:USERPROFILE\scoop\apps\mingw-mstorsjo-llvm-ucrt\current\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Build windows icon resource
         if: matrix.jobs.goos == 'windows'
@@ -141,9 +141,12 @@ jobs:
             esac
           fi
 
-          go build -v -trimpath \
-            -ldflags "-X 'github.com/summonhim/gzgspg/internal/version.Value=${VERSION}' -X 'github.com/summonhim/gzgspg/internal/version.BuildTime=${BUILDTIME}' -w -s" \
-            -o "${BIN}"
+          LD_FLAGS="-X 'github.com/summonhim/gzgspg/internal/version.Value=${VERSION}' -X 'github.com/summonhim/gzgspg/internal/version.BuildTime=${BUILDTIME}' -w -s"
+          if [ "${{ matrix.jobs.goos }}" = "windows" ]; then
+            # GUI 应用：不挂控制台子系统，避免双击时弹出黑框
+            LD_FLAGS="-H=windowsgui ${LD_FLAGS}"
+          fi
+          go build -v -trimpath -ldflags "${LD_FLAGS}" -o "${BIN}"
 
           if [ "${{ matrix.jobs.goos }}" = "windows" ]; then
             cp "${BIN}" "dist/gzgspg-windows-${{ matrix.jobs.output }}.exe"
