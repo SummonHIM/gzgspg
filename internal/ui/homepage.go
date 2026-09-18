@@ -46,10 +46,11 @@ func newHomePage(ctrl *controller.Controller, onLogin func(), onSettings func())
 
 	topRight := container.NewHBox(layout.NewSpacer(), settingsBtn)
 
-	// Logo 与账号密码作为一整组垂直居中：上下各一个 Spacer 夹住
+	// Logo 与标题、账号密码作为一整组垂直居中：上下各一个 Spacer 夹住
 	center := container.NewVBox(
 		layout.NewSpacer(),
-		container.NewPadded(logo),
+		container.NewCenter(logo),
+		container.NewCenter(appTitle()),
 		h.username,
 		h.password,
 		layout.NewSpacer(),
@@ -72,6 +73,11 @@ func logoObject() fyne.CanvasObject {
 	img.FillMode = canvas.ImageFillContain
 	img.SetMinSize(fyne.NewSize(160, 160))
 	return img
+}
+
+// appTitle 返回界面标题文案，与窗口标题、FyneApp.toml 中的发布名一致。
+func appTitle() fyne.CanvasObject {
+	return widget.NewLabelWithStyle("广工商校园网登录器", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 }
 
 // collect 把首页字段写回 controller。
