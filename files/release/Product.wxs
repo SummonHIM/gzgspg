@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="广工商校园网登录器"
+      Manufacturer="SummonHIM"
+      Version="@@VERSION@@"
+      UpgradeCode="8B1F0F13-6E2B-4C3A-9A64-6E0E9F5C2A71"
+      Scope="@@SCOPE@@"
+      Language="2052"
+      InstallerVersion="500"
+      Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="已安装更新版本，无法降级安装。" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="@@INSTALL_ROOT_ID@@">
+      <Directory Id="INSTALLFOLDER" Name="gzgspg">
+        <Component Id="MainExecutable" Guid="*">
+          <File Id="gzgspg.exe" Source="@@EXE@@" KeyPath="yes">
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuDir"
+                      Name="广工商校园网登录器"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Advertise="yes" />
+          </File>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuDir" Name="广工商校园网登录器" />
+    </StandardDirectory>
+
+  </Package>
+</Wix>
