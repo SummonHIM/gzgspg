@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	defaultUserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
-	defaultKAliveLink = "http://3.3.3.3"
-	defaultKeepAlive  = 5
-	defaultRetryMax   = 3
-	defaultRetryTime  = 5
+	defaultUserAgent  = controller.DefaultUserAgent
+	defaultKAliveLink = controller.DefaultKAliveLink
+	defaultKeepAlive  = controller.DefaultKeepAlive
+	defaultRetryMax   = controller.DefaultRetryMax
+	defaultRetryTime  = controller.DefaultRetryTime
 )
 
 // settingsPage 是高级设置页。

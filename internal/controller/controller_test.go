@@ -33,17 +33,102 @@ func validInstance() config.ConfigInstance {
 	}
 }
 
-func TestNewWithMissingFileUsesEmptyConfig(t *testing.T) {
+func wantDefaults(t *testing.T, c *Controller) {
+	t.Helper()
+	inst := c.Instance()
+	if inst.Interface != "" {
+		t.Fatalf("expected empty interface, got %q", inst.Interface)
+	}
+	if inst.UserAgent != DefaultUserAgent {
+		t.Fatalf("expected default user agent, got %q", inst.UserAgent)
+	}
+	if inst.KAliveLink != DefaultKAliveLink {
+		t.Fatalf("expected default keep_alive_link, got %q", inst.KAliveLink)
+	}
+	if inst.KeepAlive != DefaultKeepAlive {
+		t.Fatalf("expected default keep_alive %d, got %d", DefaultKeepAlive, inst.KeepAlive)
+	}
+	if inst.RetryMax != DefaultRetryMax {
+		t.Fatalf("expected default retry_max %d, got %d", DefaultRetryMax, inst.RetryMax)
+	}
+	if inst.RetryTime != DefaultRetryTime {
+		t.Fatalf("expected default retry_time %d, got %d", DefaultRetryTime, inst.RetryTime)
+	}
+}
+
+func TestNewWithMissingFileWritesDefaultConfig(t *testing.T) {
 	c, path := newTestController(t)
-	if c.Config() == nil {
-		t.Fatal("expected non-nil config")
+
+	if len(c.Config().Instance) != 1 {
+		t.Fatalf("expected 1 default instance, got %d", len(c.Config().Instance))
 	}
-	if len(c.Config().Instance) != 0 {
-		t.Fatalf("expected empty instance list, got %d", len(c.Config().Instance))
+	wantDefaults(t, c)
+
+	// 文件应已被创建，且能被重新加载
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected config file to be created: %v", err)
 	}
-	// 未保存前文件不应存在
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("config file should not exist yet, err=%v", err)
+	c2, err := New(Options{ConfigPath: path})
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	wantDefaults(t, c2)
+}
+
+func TestNewWithExistingEmptyFieldsKeepsThem(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	// 手动写一份字段刻意留空但合法的配置
+	raw := `{"log_level":0,"log_path":"","instance":[{"username":"u","password":"p","interface":"","user_agent":"","keep_alive":5,"keep_alive_link":"","retry_max":0,"retry_time":5}]}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	c, err := New(Options{ConfigPath: path})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+
+	inst := c.Instance()
+	if inst.UserAgent != "" || inst.KAliveLink != "" {
+		t.Fatalf("existing empty fields must not be filled: %+v", inst)
+	}
+	if inst.RetryMax != 0 {
+		t.Fatalf("expected retry_max 0 preserved, got %d", inst.RetryMax)
+	}
+
+	// 磁盘文件不得被改写
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != raw {
+		t.Fatalf("file must be untouched\nwant: %s\ngot:  %s", raw, got)
+	}
+}
+
+func TestNewWithInvalidFileDoesNotOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	// 非法 JSON：用户改坏了配置文件
+	raw := `{"instance": [`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	c, err := New(Options{ConfigPath: path})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	wantDefaults(t, c)
+
+	// 关键：非法文件必须原样保留，不能被默认值顶掉
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != raw {
+		t.Fatalf("invalid file must be preserved\nwant: %s\ngot:  %s", raw, got)
 	}
 }
 
@@ -111,22 +196,25 @@ func TestSaveRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSaveWithoutInstanceStillWritesFile(t *testing.T) {
+func TestSaveWithoutEmptyingInstanceWritesFile(t *testing.T) {
 	c, path := newTestController(t)
-	// 空配置时 Save 不应因 Validate 失败而报错——Save 不做校验
+	// 首次运行已写出默认值文件，Save 必须可重复调用且不报错
 	if err := c.Save(); err != nil {
-		t.Fatalf("save empty: %v", err)
+		t.Fatalf("save: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected file to exist: %v", err)
 	}
+	if len(c.Config().Instance) != 1 {
+		t.Fatalf("expected default instance preserved, got %d", len(c.Config().Instance))
+	}
 }
 
-func TestStartRejectsInvalidConfig(t *testing.T) {
+func TestStartRejectsMissingCredentials(t *testing.T) {
 	c, _ := newTestController(t)
-	// 空配置 → engine.New 的 Validate 失败
+	// 默认值配置没有账号密码 → engine.New 的 Validate 失败
 	if err := c.Start(); err == nil {
-		t.Fatal("expected error starting with empty config")
+		t.Fatal("expected error starting without credentials")
 	}
 	if c.Running() {
 		t.Fatal("should not be running after failed start")

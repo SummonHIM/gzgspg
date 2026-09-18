@@ -6,11 +6,34 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/summonhim/gzgspd/config"
 	"github.com/summonhim/gzgspd/engine"
 )
+
+// 高级字段的默认值。必须与 gzgspd engine 的内部默认保持一致。
+// 界面层应引用这些常量，避免两处默认值漂移。
+const (
+	DefaultUserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+	DefaultKAliveLink = "http://3.3.3.3"
+	DefaultKeepAlive  = 5
+	DefaultRetryMax   = 3
+	DefaultRetryTime  = 5
+)
+
+// defaultInstance 返回首次运行使用的实例：账号密码留空，高级字段取默认值。
+// interface 保持空，语义为自动探测网卡。
+func defaultInstance() config.ConfigInstance {
+	return config.ConfigInstance{
+		UserAgent:  DefaultUserAgent,
+		KAliveLink: DefaultKAliveLink,
+		KeepAlive:  DefaultKeepAlive,
+		RetryMax:   DefaultRetryMax,
+		RetryTime:  DefaultRetryTime,
+	}
+}
 
 // Options 配置 Controller。
 type Options struct {
@@ -36,8 +59,8 @@ type Controller struct {
 	observer []func(engine.Event)
 }
 
-// New 加载配置。配置不存在或无效时，返回一个持有空配置的 Controller（不报错），
-// 以便首次运行时用户可以在界面里填写。
+// New 加载配置。配置文件缺失时，写出一份带默认值的文件供用户填写；
+// 文件存在但内容非法时，只在内存里退回默认值，绝不覆盖用户的文件。
 func New(opts Options) (*Controller, error) {
 	logger := opts.Logger
 	if logger == nil {
@@ -52,10 +75,21 @@ func New(opts Options) (*Controller, error) {
 
 	cfg, err := config.LoadConfig(opts.ConfigPath)
 	if err != nil {
-		// 文件不存在或内容非法：使用空配置，路径先记下，Save 时写出
-		c.logger.Info("starting with empty config", "path", opts.ConfigPath, "reason", err)
 		cfg = &config.Config{}
 		cfg.SetFilePath(opts.ConfigPath)
+		cfg.Instance = []config.ConfigInstance{defaultInstance()}
+
+		if errors.Is(err, os.ErrNotExist) {
+			// 首次运行：把默认值写成一份文件，让界面与磁盘同源
+			if saveErr := cfg.Save(); saveErr != nil {
+				c.logger.Error("write default config failed", "path", opts.ConfigPath, "error", saveErr)
+			} else {
+				c.logger.Info("created default config", "path", opts.ConfigPath)
+			}
+		} else {
+			// 文件存在但非法：保留原文件，仅在内存里使用默认值
+			c.logger.Info("config invalid, keeping file as-is", "path", opts.ConfigPath, "reason", err)
+		}
 	}
 	c.cfg = cfg
 
