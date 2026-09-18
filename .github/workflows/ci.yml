@@ -183,7 +183,8 @@ jobs:
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
               apt-get install -y curl file fuse libfuse2 desktop-file-utils \
-                libgtk-3-0 libgtk-3-bin libayatana-appindicator3-1
+                libgtk-3-0 libgtk-3-bin libayatana-appindicator3-1 \
+                libgl1 libglx-mesa0 libegl1 libgles2
               curl -fsSL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
               # plugin-gtk 没有 release 资源（404），且 linuxdeploy 只按 linuxdeploy-plugin-gtk 这个名字在 PATH 里找插件。
               curl -fsSL -o linuxdeploy-plugin-gtk https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
