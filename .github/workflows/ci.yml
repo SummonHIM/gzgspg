@@ -53,15 +53,14 @@ jobs:
       fail-fast: false
       matrix:
         jobs:
-          - { goos: linux, goarch: "386", output: "386", deps: multilib, deb: i386, rpm: i386 }
           - { goos: linux, goarch: amd64, output: amd64, deb: amd64, rpm: x86_64 }
-          - { goos: linux, goarch: arm64, output: arm64, deps: arm64, deb: arm64, rpm: aarch64 }
+          - { goos: linux, goarch: arm64, output: arm64, runs-on: ubuntu-24.04-arm, deb: arm64, rpm: aarch64 }
 
           - { goos: windows, goarch: "386", output: "386", runs-on: windows-latest, win: true }
           - { goos: windows, goarch: amd64, output: amd64, runs-on: windows-latest, win: true }
           - { goos: windows, goarch: arm64, output: arm64, runs-on: windows-latest, win: true }
 
-          - { goos: darwin, goarch: amd64, output: amd64, runs-on: macos-13, mac: true }
+          - { goos: darwin, goarch: amd64, output: amd64, runs-on: macos-14, mac: true }
           - { goos: darwin, goarch: arm64, output: arm64, runs-on: macos-14, mac: true }
 
     steps:
@@ -78,60 +77,10 @@ jobs:
         run: |
           sudo apt-get update
 
-          # 原生 amd64：直接装开发包
+          # amd64 走 ubuntu-latest，arm64 走原生 ubuntu-24.04-arm，均直接装开发包，无需 multiarch 交叉。
           sudo apt-get install -y \
             gcc pkg-config \
             libgl1-mesa-dev xorg-dev libgtk-3-dev libayatana-appindicator3-dev
-
-          if [ "${{ matrix.jobs.deps }}" = "multilib" ]; then
-            # 386 需要 i386 版的 GL/X11 开发库，否则链接期找不到 -lGL / -lX11 等
-            sudo dpkg --add-architecture i386
-            sudo apt-get update
-            sudo apt-get install -y gcc-multilib
-            sudo apt-get install -y \
-              libgl1-mesa-dev:i386 \
-              libglu1-mesa-dev:i386 \
-              libx11-dev:i386 \
-              libxrandr-dev:i386 \
-              libxxf86vm-dev:i386 \
-              libxi-dev:i386 \
-              libxcursor-dev:i386 \
-              libxinerama-dev:i386 \
-              libxkbcommon-dev:i386 \
-              libwayland-dev:i386 \
-              libgtk-3-dev:i386 \
-              libayatana-appindicator3-dev:i386
-          fi
-
-          if [ "${{ matrix.jobs.deps }}" = "arm64" ]; then
-            # arm64 交叉编译：需要 arm64 版的 GL/X11 开发库才能链接。
-            # 主源限定 amd64，arm64 走 ports.ubuntu.com（archive 上 arm64 会 404）。
-            sudo dpkg --add-architecture arm64
-            sudo sed -i \
-              -e 's|^deb |deb [arch=amd64] |' \
-              -e 's|^deb-src |deb-src [arch=amd64] |' \
-              /etc/apt/sources.list
-            CODENAME="$(lsb_release -cs)"
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME} main restricted universe multiverse" \
-              | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.list > /dev/null
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${CODENAME}-updates main restricted universe multiverse" \
-              | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports-arm64.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-            sudo apt-get install -y \
-              libgl1-mesa-dev:arm64 \
-              libglu1-mesa-dev:arm64 \
-              libx11-dev:arm64 \
-              libxrandr-dev:arm64 \
-              libxxf86vm-dev:arm64 \
-              libxi-dev:arm64 \
-              libxcursor-dev:arm64 \
-              libxinerama-dev:arm64 \
-              libxkbcommon-dev:arm64 \
-              libwayland-dev:arm64 \
-              libgtk-3-dev:arm64 \
-              libayatana-appindicator3-dev:arm64
-          fi
 
       - name: Set up environment variables
         shell: bash
@@ -146,6 +95,18 @@ jobs:
           echo "PKGARCH_DEB=${{ matrix.jobs.deb }}" >> $GITHUB_ENV
           echo "PKGARCH_RPM=${{ matrix.jobs.rpm }}" >> $GITHUB_ENV
           echo "BUILDTIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+
+      - name: Install LLVM-MinGW
+        if: matrix.jobs.goos == 'windows'
+        shell: bash
+        run: |
+          set -xeuo pipefail
+          # windows-latest 自带的 mingw 只有 x86_64，编不了 386/arm64；用 LLVM-MinGW 一套覆盖三个架构。
+          curl -fsSL -o "$RUNNER_TEMP/llvm-mingw.zip" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20260908/llvm-mingw-20260908-ucrt-x86_64.zip"
+          "/c/Program Files/7-Zip/7z.exe" x "$RUNNER_TEMP/llvm-mingw.zip" -o"$RUNNER_TEMP/llvm-mingw" -y
+          echo "$RUNNER_TEMP/llvm-mingw/llvm-mingw-20260908-ucrt-x86_64/bin" >> "$GITHUB_PATH"
+
       - name: Build windows icon resource
         if: matrix.jobs.goos == 'windows'
         shell: bash
@@ -171,13 +132,13 @@ jobs:
           fi
           echo "BIN=${BIN}" >> $GITHUB_ENV
 
-          # 32 位 linux 需要 -m32 的编译与链接标志；写成 CC="gcc -m32" 会被 Go 当作命令名。
-          if [ "${{ matrix.jobs.goos }}" = "linux" ] && [ "${{ matrix.jobs.goarch }}" = "386" ]; then
-            export CGO_CFLAGS="-m32"
-            export CGO_LDFLAGS="-m32"
-          fi
-          if [ "${{ matrix.jobs.goos }}" = "linux" ] && [ "${{ matrix.jobs.goarch }}" = "arm64" ]; then
-            export CC="aarch64-linux-gnu-gcc"
+          # Windows 三个架构各用 LLVM-MinGW 的对应交叉编译器（x64 自带的 mingw 无法编 386/arm64）。
+          if [ "${{ matrix.jobs.goos }}" = "windows" ]; then
+            case "${{ matrix.jobs.goarch }}" in
+              amd64) export CC="x86_64-w64-mingw32-gcc" ;;
+              "386") export CC="i686-w64-mingw32-gcc" ;;
+              arm64) export CC="aarch64-w64-mingw32-gcc" ;;
+            esac
           fi
 
           go build -v -trimpath \
@@ -186,7 +147,9 @@ jobs:
 
           if [ "${{ matrix.jobs.goos }}" = "windows" ]; then
             cp "${BIN}" "dist/gzgspg-windows-${{ matrix.jobs.output }}.exe"
-            (cd dist && zip "gzgspg-windows-${{ matrix.jobs.output }}-${VERSION}.zip" "gzgspg-windows-${{ matrix.jobs.output }}.exe")
+            (cd dist && "/c/Program Files/7-Zip/7z.exe" a \
+              "gzgspg-windows-${{ matrix.jobs.output }}-${VERSION}.zip" \
+              "gzgspg-windows-${{ matrix.jobs.output }}.exe")
           elif [ "${{ matrix.jobs.goos }}" = "linux" ]; then
             tar -czf "dist/gzgspg-linux-${{ matrix.jobs.output }}-${VERSION}.tar.gz" -C . "${BIN}"
           fi
@@ -217,13 +180,17 @@ jobs:
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
               apt-get install -y curl file fuse libfuse2 desktop-file-utils \
-                libgtk-3-0 libayatana-appindicator3-1
+                libgtk-3-0 libgtk-3-bin libayatana-appindicator3-1
               curl -fsSL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-              curl -fsSL -o plugin-gtk https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk.sh
-              chmod +x linuxdeploy plugin-gtk
+              # plugin-gtk 没有 release 资源（404），且 linuxdeploy 只按 linuxdeploy-plugin-gtk 这个名字在 PATH 里找插件。
+              curl -fsSL -o linuxdeploy-plugin-gtk https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
+              chmod +x linuxdeploy linuxdeploy-plugin-gtk
+              export PATH="$PWD:$PATH"
               export ARCH=x86_64
               export DEPLOY_GTK_VERSION=3
               export LINUXDEPLOY_OUTPUT_VERSION="${VERSION}"
+              # 容器内没有 fuse，让 AppImage 自解压运行
+              export APPIMAGE_EXTRACT_AND_RUN=1
               ./linuxdeploy --appdir AppDir \
                 --desktop-file files/release/gzgspg.desktop \
                 --icon-file assets/icon.png \
