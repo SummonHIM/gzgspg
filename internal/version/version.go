@@ -7,7 +7,7 @@ var (
 	// Value 由构建期 -ldflags -X 注入。
 	Value = "dev"
 	// BuildTime 由构建期 -ldflags -X 注入。
-	BuildTime = "0"
+	BuildTime = "unknown"
 )
 
 // String 返回 "Value BuildTime" 形式，供 CLI 与 GUI 展示。

@@ -20,7 +20,7 @@ func TestDefaults(t *testing.T) {
 	if Value != "dev" {
 		t.Fatalf("Value default = %q, want %q", Value, "dev")
 	}
-	if BuildTime != "0" {
-		t.Fatalf("BuildTime default = %q, want %q", BuildTime, "0")
+	if BuildTime != "unknown" {
+		t.Fatalf("BuildTime default = %q, want %q", BuildTime, "unknown")
 	}
 }
