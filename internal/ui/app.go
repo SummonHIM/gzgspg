@@ -4,6 +4,7 @@ package ui
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -13,6 +14,9 @@ import (
 	"github.com/summonhim/gzgspg/internal/configdir"
 	"github.com/summonhim/gzgspg/internal/controller"
 )
+
+// quitPause 是退出时用于让人看见「正在登出」的停顿。
+const quitPause = 600 * time.Millisecond
 
 // Run 启动 GUI，阻塞至退出。
 func Run() error {
@@ -56,11 +60,13 @@ func Run() error {
 	var (
 		home       *homePage
 		run        *runPage
+		tray       *trayController
 		showHome   func()
 		showRun    func()
 		onLogin    func()
 		onSettings func()
 		onLogout   func()
+		quit       func()
 	)
 
 	showHome = func() {
@@ -69,8 +75,11 @@ func Run() error {
 		stack.Refresh()
 	}
 
+	// showRun 切换到运行页。进入前先按当前状态设一次文案，
+	// 之后由事件回调持续更新。
 	showRun = func() {
 		run = newRunPage(onLogout)
+		run.setState(ctrl.State())
 		stack.Objects = []fyne.CanvasObject{run.root}
 		stack.Refresh()
 	}
@@ -125,11 +134,31 @@ func Run() error {
 		}()
 	}
 
+	// quit 处理托盘「退出」：运行中先显示运行页、完成登出再退出。
+	quit = func() {
+		if !ctrl.Running() {
+			// 没有会话可登出，直接退出
+			fyne.Do(func() { a.Quit() })
+			return
+		}
+		go func() {
+			fyne.Do(func() {
+				win.Show()
+				showRun()
+			})
+			ctrl.Stop()
+			ctrl.WaitStopped()
+			time.Sleep(quitPause)
+			fyne.Do(func() { a.Quit() })
+		}()
+	}
+
 	ctrl.Subscribe(func(ev engine.Event) {
 		fyne.Do(func() {
 			if run != nil {
 				run.setState(ev.State)
 			}
+			tray.setState(ev.State)
 		})
 	})
 
@@ -138,7 +167,10 @@ func Run() error {
 	win.SetContent(stack)
 	win.SetCloseIntercept(func() { win.Hide() })
 
-	setupTray(a, win, ctrl)
+	tray = setupTray(a, win,
+		func() { fyne.Do(func() { win.Show() }) },
+		quit,
+	)
 
 	win.ShowAndRun()
 	return nil
