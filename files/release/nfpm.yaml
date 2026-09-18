@@ -2,6 +2,7 @@ name: gzgspg
 arch: "{{.Env.PKGARCH}}"
 platform: linux
 version: "{{.Env.PKGVER}}"
+file_name_template: "gzgspg-linux-{{.Arch}}-{{.Version}}{{.ConventionalExtension}}"
 section: net
 priority: optional
 maintainer: SummonHIM <summonhim@summonhim.top>
