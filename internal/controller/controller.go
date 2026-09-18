@@ -96,11 +96,13 @@ func New(opts Options) (*Controller, error) {
 	return c, nil
 }
 
-// Config 返回当前配置。调用方不应修改返回值。
+// Config 返回当前配置的副本。调用方修改返回值不会影响内部状态。
 func (c *Controller) Config() *config.Config {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.cfg
+	cp := *c.cfg
+	cp.Instance = append([]config.ConfigInstance(nil), c.cfg.Instance...)
+	return &cp
 }
 
 // Instance 返回 instance[0] 的副本；不存在时返回零值。

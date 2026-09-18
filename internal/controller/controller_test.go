@@ -322,3 +322,16 @@ func TestSubscribeReceivesEvents(t *testing.T) {
 		t.Fatal("no event received within timeout")
 	}
 }
+
+func TestConfigIsCopy(t *testing.T) {
+	c, _ := newTestController(t)
+	got := c.Config()
+	got.Instance[0].Username = "mutated"
+	got.LogLevel = 99
+	if c.Instance().Username != "" {
+		t.Fatalf("expected username unchanged, got %q", c.Instance().Username)
+	}
+	if c.Config().LogLevel != 0 {
+		t.Fatalf("expected log level unchanged, got %d", c.Config().LogLevel)
+	}
+}
