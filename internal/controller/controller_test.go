@@ -167,6 +167,47 @@ func TestStartStopLifecycle(t *testing.T) {
 	}
 }
 
+func TestWaitStoppedReturnsAfterStop(t *testing.T) {
+	c, _ := newTestController(t)
+	c.UpdateInstance(validInstance())
+
+	if err := c.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		c.Stop()
+		c.WaitStopped()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+	case <-timeoutChan():
+		t.Fatal("WaitStopped did not return within timeout")
+	}
+	if c.Running() {
+		t.Fatal("expected not running once WaitStopped returned")
+	}
+}
+
+func TestWaitStoppedWhenIdleReturnsImmediately(t *testing.T) {
+	c, _ := newTestController(t)
+
+	done := make(chan struct{})
+	go func() {
+		c.WaitStopped()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-timeoutChan():
+		t.Fatal("WaitStopped should return immediately when idle")
+	}
+}
+
 func TestSubscribeReceivesEvents(t *testing.T) {
 	c, _ := newTestController(t)
 	c.UpdateInstance(validInstance())

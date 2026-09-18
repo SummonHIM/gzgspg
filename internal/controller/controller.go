@@ -29,6 +29,7 @@ type Controller struct {
 	cfg      *config.Config
 	eng      *engine.Engine
 	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 	running  bool
 	state    engine.State
 	lastErr  error
@@ -127,6 +128,7 @@ func (c *Controller) Start() error {
 	c.eng = eng
 	c.cancel = cancel
 	c.running = true
+	c.wg.Add(1)
 	c.mu.Unlock()
 
 	// 事件转发与运行都在后台，Start 立即返回
@@ -136,6 +138,8 @@ func (c *Controller) Start() error {
 
 // consume 运行引擎并把事件转发给订阅者，结束后复位状态。
 func (c *Controller) consume(ctx context.Context, eng *engine.Engine) {
+	defer c.wg.Done()
+
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -165,7 +169,8 @@ func (c *Controller) consume(ctx context.Context, eng *engine.Engine) {
 	c.mu.Unlock()
 }
 
-// Stop 取消引擎并等待其完成登出。
+// Stop 请求停止引擎。非阻塞：只取消 context，登出与复位在后台完成。
+// 需要确认已完全停止（例如切换界面）时，配合 WaitStopped 使用。
 func (c *Controller) Stop() {
 	c.mu.Lock()
 	cancel := c.cancel
@@ -173,6 +178,12 @@ func (c *Controller) Stop() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+// WaitStopped 阻塞至引擎完全停止（事件循环结束、状态复位）。
+// 若当前未运行则立即返回。可在任意 goroutine 调用。
+func (c *Controller) WaitStopped() {
+	c.wg.Wait()
 }
 
 // Running 返回引擎是否在运行。

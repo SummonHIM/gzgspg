@@ -46,6 +46,7 @@ func Run() error {
 	}
 
 	win := a.NewWindow("广工商校园网登录器")
+	win.SetIcon(appIcon())
 	win.Resize(fyne.NewSize(420, 640))
 
 	// 三视图共用一个 Stack，切换时只替换内容
@@ -116,7 +117,10 @@ func Run() error {
 
 	onLogout = func() {
 		go func() {
+			// Stop 只发起取消；等引擎真正停稳（含登出）再切回首页，
+			// 否则切页后残留的引擎事件无处可去。
 			ctrl.Stop()
+			ctrl.WaitStopped()
 			fyne.Do(showHome)
 		}()
 	}
