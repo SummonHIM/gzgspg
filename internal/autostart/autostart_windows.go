@@ -32,12 +32,47 @@ func Enable() error {
 	if err != nil {
 		return err
 	}
+	return writeTarget(exe)
+}
+
+// writeTarget 把自启项指向指定路径（不存在则创建）。
+func writeTarget(path string) error {
 	k, _, err := registry.CreateKey(registry.CURRENT_USER, runKey, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer k.Close()
-	return k.SetStringValue(AppName, exe)
+	return k.SetStringValue(AppName, path)
+}
+
+// targetPath 返回当前自启项指向的可执行路径；不存在时 ok 为 false。
+func targetPath() (string, bool) {
+	k, err := registry.OpenKey(registry.CURRENT_USER, runKey, registry.QUERY_VALUE)
+	if err != nil {
+		return "", false
+	}
+	defer k.Close()
+	v, _, err := k.GetStringValue(AppName)
+	if err != nil {
+		return "", false
+	}
+	return v, true
+}
+
+// Reconcile 让 OS 自启状态与期望一致：期望开启时确保指向当前 exe，
+// 期望关闭时移除自启项。指向与当前 exe 一致时不写入。
+func Reconcile(enabled bool) error {
+	if !enabled {
+		return Disable()
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if cur, ok := targetPath(); ok && cur == exe {
+		return nil
+	}
+	return writeTarget(exe)
 }
 
 // Disable 关闭自启。
