@@ -5,6 +5,7 @@ package autostart
 import (
 	"errors"
 	"os"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows/registry"
@@ -36,13 +37,14 @@ func Enable() error {
 }
 
 // writeTarget 把自启项指向指定路径（不存在则创建）。
+// 路径整体加引号，避免含空格路径（如 Program Files）在 Run 键里被截断。
 func writeTarget(path string) error {
 	k, _, err := registry.CreateKey(registry.CURRENT_USER, runKey, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer k.Close()
-	return k.SetStringValue(AppName, path)
+	return k.SetStringValue(AppName, `"`+path+`"`)
 }
 
 // targetPath 返回当前自启项指向的可执行路径；不存在时 ok 为 false。
@@ -56,7 +58,7 @@ func targetPath() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return v, true
+	return strings.Trim(v, `"`), true
 }
 
 // Reconcile 让 OS 自启状态与期望一致：期望开启时确保指向当前 exe，

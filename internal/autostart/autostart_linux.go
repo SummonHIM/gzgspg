@@ -40,6 +40,7 @@ func Enable() error {
 }
 
 // writeTarget 把自启项指向指定路径，写入 autostart desktop 文件。
+// 路径含空格时用引号包裹，避免 Exec= 行被按空格拆解。
 func writeTarget(path string) error {
 	p, err := desktopFilePath()
 	if err != nil {
@@ -48,12 +49,16 @@ func writeTarget(path string) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
+	exec := path
+	if strings.Contains(path, " ") {
+		exec = `"` + path + `"`
+	}
 	content := fmt.Sprintf(`[Desktop Entry]
 Type=Application
 Name=%s
 Exec=%s
 X-GNOME-Autostart-enabled=true
-`, AppName, path)
+`, AppName, exec)
 	return os.WriteFile(p, []byte(content), 0o644)
 }
 
@@ -69,8 +74,10 @@ func targetPath() (string, bool) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, "Exec=") {
-			// 容错 CRLF：去掉行尾回车，否则 Reconcile 每次启动都会误判并重写。
-			return strings.TrimRight(strings.TrimPrefix(line, "Exec="), "\r"), true
+			// 容错 CRLF 与引号：去掉行尾回车与包裹引号，保证 Reconcile 相等比较稳定。
+			v := strings.TrimPrefix(line, "Exec=")
+			v = strings.TrimRight(v, "\r")
+			return strings.Trim(v, `"`), true
 		}
 	}
 	return "", false
