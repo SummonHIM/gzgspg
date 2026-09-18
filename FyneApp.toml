@@ -1,0 +1,9 @@
+[Details]
+Icon = "assets/icon.png"
+Name = "gzgspg"
+ID = "top.summonhim.gzgspg"
+Version = "0.1.0"
+Build = 1
+
+[Release]
+Name = "广工商校园网登录器"
