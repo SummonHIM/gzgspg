@@ -11,12 +11,11 @@ import (
 	"github.com/summonhim/gzgspg/internal/controller"
 )
 
+// 数值字段的兜底默认值，仅在输入框为空或内容非法时使用。
 const (
-	defaultUserAgent  = controller.DefaultUserAgent
-	defaultKAliveLink = controller.DefaultKAliveLink
-	defaultKeepAlive  = controller.DefaultKeepAlive
-	defaultRetryMax   = controller.DefaultRetryMax
-	defaultRetryTime  = controller.DefaultRetryTime
+	defaultKeepAlive = controller.DefaultKeepAlive
+	defaultRetryMax  = controller.DefaultRetryMax
+	defaultRetryTime = controller.DefaultRetryTime
 )
 
 // settingsPage 是高级设置页。
@@ -92,17 +91,17 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 	return s
 }
 
-// load 从配置载入；值为空时填入默认值。
+// load 从配置载入。配置在 controller 侧已带默认值，这里直读、不回填，
+// 以便界面如实反映文件内容（用户清空的字段就显示为空）。
 func (s *settingsPage) load() {
 	inst := s.ctrl.Instance()
 
 	s.iface.SetText(inst.Interface) // interface 默认空 = 自动探测
-
-	s.userAgent.SetText(orDefault(inst.UserAgent, defaultUserAgent))
-	s.keepAlive.SetText(orDefaultInt(inst.KeepAlive, defaultKeepAlive))
-	s.kAliveLink.SetText(orDefault(inst.KAliveLink, defaultKAliveLink))
-	s.retryMax.SetText(orDefaultInt(inst.RetryMax, defaultRetryMax))
-	s.retryTime.SetText(orDefaultInt(inst.RetryTime, defaultRetryTime))
+	s.userAgent.SetText(inst.UserAgent)
+	s.keepAlive.SetText(strconv.Itoa(inst.KeepAlive))
+	s.kAliveLink.SetText(inst.KAliveLink)
+	s.retryMax.SetText(strconv.Itoa(inst.RetryMax))
+	s.retryTime.SetText(strconv.Itoa(inst.RetryTime))
 }
 
 // collect 写回 controller。
@@ -117,20 +116,8 @@ func (s *settingsPage) collect() {
 	s.ctrl.UpdateInstance(inst)
 }
 
-func orDefault(v, def string) string {
-	if v == "" {
-		return def
-	}
-	return v
-}
-
-func orDefaultInt(v, def int) string {
-	if v == 0 {
-		return strconv.Itoa(def)
-	}
-	return strconv.Itoa(v)
-}
-
+// atoiOr 把输入框文本转为整数；空串或非法输入回退到 def。
+// 这是空输入的兜底：0 会让 keep_alive/retry_time 违反 engine 校验，启动失败。
 func atoiOr(s string, def int) int {
 	if n, err := strconv.Atoi(s); err == nil {
 		return n
