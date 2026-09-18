@@ -1,0 +1,21 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.*
+
+# Build output
+build/
+dist/
+
+# Config (contains credentials)
+/config.json
+
+# Editor
+.vscode
