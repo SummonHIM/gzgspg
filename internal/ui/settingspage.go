@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
@@ -43,7 +44,7 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		kAliveLink: widget.NewEntry(),
 		retryMax:   widget.NewEntry(),
 		retryTime:  widget.NewEntry(),
-		autostart:  widget.NewCheck("开机自启", nil),
+		autostart:  widget.NewCheck("开启", nil),
 		autoStatus: widget.NewLabel(""),
 	}
 	s.load()
@@ -75,7 +76,7 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 	form := widget.NewForm(
 		widget.NewFormItem("网卡名称", s.iface),
 		widget.NewFormItem("User-Agent", s.userAgent),
-		widget.NewFormItem("监测在线间隔 (秒)", s.keepAlive),
+		widget.NewFormItem("监测间隔 (秒)", s.keepAlive),
 		widget.NewFormItem("监测在线链接", s.kAliveLink),
 		widget.NewFormItem("最大重试次数", s.retryMax),
 		widget.NewFormItem("重试间隔 (秒)", s.retryTime),
@@ -91,7 +92,7 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 	backBtn := widget.NewButton("保存并返回", onBack)
 	backBtn.Importance = widget.HighImportance
 	s.root = container.NewBorder(
-		nil,
+		container.NewCenter(settingTitle()),
 		container.NewPadded(backBtn),
 		nil, nil,
 		container.NewVScroll(body),
@@ -131,4 +132,14 @@ func atoiOr(s string, def int) int {
 		return n
 	}
 	return def
+}
+
+// settingTitle 返回设置页面标题文案。
+func settingTitle() fyne.CanvasObject {
+	return &canvas.Text{
+		Text:      "高级设置",
+		TextSize:  titleSize,
+		TextStyle: fyne.TextStyle{Bold: true},
+		Alignment: fyne.TextAlignCenter,
+	}
 }

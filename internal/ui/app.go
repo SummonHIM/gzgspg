@@ -51,7 +51,7 @@ func Run() error {
 
 	win := a.NewWindow("广工商校园网登录器")
 	win.SetIcon(appIcon())
-	win.Resize(fyne.NewSize(420, 640))
+	win.Resize(fyne.NewSize(320, 480))
 
 	// 三视图共用一个 Stack，切换时只替换内容
 	stack := container.NewStack()
