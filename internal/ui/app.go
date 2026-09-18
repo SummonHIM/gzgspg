@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"github.com/summonhim/gzgspd/engine"
+	"github.com/summonhim/gzgspg/internal/autostart"
 	"github.com/summonhim/gzgspg/internal/configdir"
 	"github.com/summonhim/gzgspg/internal/controller"
 )
@@ -64,6 +65,7 @@ func Run() error {
 		showHome   func()
 		showRun    func()
 		onLogin    func()
+		login      func()
 		onSettings func()
 		onLogout   func()
 		quit       func()
@@ -107,12 +109,17 @@ func Run() error {
 		showSettings()
 	}
 
-	onLogin = func() {
+	// login 是登录按钮与启动自动登录共用的动作。
+	login = func() {
 		if home == nil {
 			return
 		}
 		home.collect()
-		home.setStatus("")
+		inst := ctrl.Instance()
+		if inst.Username == "" || inst.Password == "" {
+			// 空凭据：静默跳过，停在首页由用户填写
+			return
+		}
 		if err := ctrl.Save(); err != nil {
 			home.setStatus("保存失败: " + err.Error())
 			return
@@ -122,6 +129,14 @@ func Run() error {
 			return
 		}
 		showRun()
+	}
+
+	onLogin = func() {
+		if home == nil {
+			return
+		}
+		home.setStatus("")
+		login()
 	}
 
 	onLogout = func() {
@@ -164,6 +179,14 @@ func Run() error {
 
 	showHome()
 
+	// 启动时让 OS 自启状态与用户期望一致（含 exe 路径失效的修正）
+	prefs := fyne.CurrentApp().Preferences()
+	if autostart.Supported() {
+		if err := autostart.Reconcile(prefs.BoolWithFallback("autostart", false)); err != nil {
+			logger.Warn("autostart reconcile failed", "error", err)
+		}
+	}
+
 	win.SetContent(stack)
 	win.SetCloseIntercept(func() { win.Hide() })
 
@@ -171,6 +194,14 @@ func Run() error {
 		func() { fyne.Do(func() { win.Show() }) },
 		quit,
 	)
+
+	// 自动登陆：开启且有账号密码时，启动即登录（ShowAndRun 会阻塞，故在此之前）
+	if prefs.BoolWithFallback("auto_login", false) {
+		inst := ctrl.Instance()
+		if inst.Username != "" && inst.Password != "" {
+			login()
+		}
+	}
 
 	win.ShowAndRun()
 	return nil
