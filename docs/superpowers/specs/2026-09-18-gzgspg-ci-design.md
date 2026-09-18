@@ -45,8 +45,16 @@ PR 只跑 check 与构建验证，不发布。
 
 ### 版本号
 
-- tag `v1.3.0` → 包版本字符串 `1.3.0`；MSI 用四段数字 `1.3.0.0`（WiX 要求）。
-- 非 tag（push main / PR）→ 版本字符串 `0.0.0-<GITHUB_RUN_NUMBER>`，仅用于构建验证。
+发布包版本**取自 tag**，只有 MSI 需要数字化映射：
+
+| 用途 | tag `v1.3.0` 时 | 说明 |
+|------|-----------------|------|
+| 文件名 / 展示 | `1.3.0` | deb、rpm、AppImage、mac、zip、tar.gz 全用这个 |
+| WiX MSI | `1.3.0.0` | 补第三段为 0，凑满 WiX 要求的四段数字 |
+| `internal/version.Value` | `1.3.0` | 构建期 `-ldflags -X` 注入 |
+
+- deb/rpm/AppImage 直接接受 `1.3.0`，**不使用 run number**；run number 只用于非 tag 构建的版本标记 `0.0.0-<GITHUB_RUN_NUMBER>`，该形态只做构建验证、不发布。
+- 预发布 tag（如 `v1.3.0-rc1`）的包版本记 `1.3.0-rc1`；实现时先确认 nfpm 对该格式的处理，若被拒则记为 `1.3.0~rc1`（deb 惯例）。
 - 版本字符串注入 `internal/version.Value`，构建时间注入 `BuildTime`，均由 `-ldflags -X` 完成。
 - `-trimpath -w -s`，与 gzgspd 的构建参数保持一致。
 - `GOTOOLCHAIN=local`，避免 runner 临时下载工具链。
@@ -102,6 +110,8 @@ WiX 官方对 per-user / per-machine 的推荐做法就是**两个安装包**：
 |------|----------|------|
 | `gzgspg-<ver>-windows-<arch>-system.msi` | `ProgramFiles64Folder\gzgspg` | `ALLUSERS=1`，需要管理员 |
 | `gzgspg-<ver>-windows-<arch>-user.msi` | `LocalAppDataFolder\gzgspg` | `ALLUSERS=2` + `MSIINSTALLPERUSER=1`，免管理员 |
+
+其中 MSI 内部 `Version` 用四段数字 `1.3.0.0`，文件名仍用 `1.3.0`。
 
 实现方式：
 
