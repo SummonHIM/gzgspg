@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func desktopFilePath() (string, error) {
@@ -29,12 +30,17 @@ func Enabled() bool {
 	return err == nil
 }
 
-// Enable 启用自启，写入 autostart desktop 文件。
+// Enable 启用自启，指向当前可执行文件。
 func Enable() error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
+	return writeTarget(exe)
+}
+
+// writeTarget 把自启项指向指定路径，写入 autostart desktop 文件。
+func writeTarget(path string) error {
 	p, err := desktopFilePath()
 	if err != nil {
 		return err
@@ -47,8 +53,41 @@ Type=Application
 Name=%s
 Exec=%s
 X-GNOME-Autostart-enabled=true
-`, AppName, exe)
+`, AppName, path)
 	return os.WriteFile(p, []byte(content), 0o644)
+}
+
+// targetPath 返回 desktop 文件中 Exec= 后的内容；读不到时 ok 为 false。
+func targetPath() (string, bool) {
+	p, err := desktopFilePath()
+	if err != nil {
+		return "", false
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return "", false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "Exec=") {
+			return strings.TrimPrefix(line, "Exec="), true
+		}
+	}
+	return "", false
+}
+
+// Reconcile 让 OS 自启状态与期望一致。
+func Reconcile(enabled bool) error {
+	if !enabled {
+		return Disable()
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if cur, ok := targetPath(); ok && cur == exe {
+		return nil
+	}
+	return writeTarget(exe)
 }
 
 // Disable 关闭自启。

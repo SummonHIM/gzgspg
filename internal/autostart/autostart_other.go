@@ -13,3 +13,6 @@ func Enable() error { return ErrUnsupported }
 
 // Disable 在当前平台不可用。
 func Disable() error { return ErrUnsupported }
+
+// Reconcile 在当前平台不可用。
+func Reconcile(enabled bool) error { return ErrUnsupported }
