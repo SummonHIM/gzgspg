@@ -88,8 +88,10 @@ func Run() error {
 
 	onBackFromSettings := func(s *settingsPage) func() {
 		return func() {
-			// 离开设置页时收集，返回首页即生效
-			s.collect()
+			// 离开设置页时校验并收集；数值非法则留在设置页让用户修正。
+			if !s.collect() {
+				return
+			}
 			showHome()
 		}
 	}

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -11,13 +12,6 @@ import (
 	"github.com/summonhim/gzgspg/internal/autostart"
 	"github.com/summonhim/gzgspg/internal/controller"
 	"github.com/summonhim/gzgspg/internal/version"
-)
-
-// 数值字段的兜底默认值，仅在输入框为空或内容非法时使用。
-const (
-	defaultKeepAlive = controller.DefaultKeepAlive
-	defaultRetryMax  = controller.DefaultRetryMax
-	defaultRetryTime = controller.DefaultRetryTime
 )
 
 // settingsPage 是高级设置页。
@@ -51,6 +45,14 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		autoStatus: widget.NewLabel(""),
 	}
 	s.load()
+
+	// 数值字段内联校验：规则与 engine 的 Validate 一致，输入即时提示。
+	s.keepAlive.Validator = validatePositiveInt
+	s.keepAlive.AlwaysShowValidationError = true
+	s.retryMax.Validator = validateNonNegativeInt
+	s.retryMax.AlwaysShowValidationError = true
+	s.retryTime.Validator = validatePositiveInt
+	s.retryTime.AlwaysShowValidationError = true
 
 	prefs := fyne.CurrentApp().Preferences()
 
@@ -137,25 +139,36 @@ func (s *settingsPage) load() {
 	s.retryTime.SetText(strconv.Itoa(inst.RetryTime))
 }
 
-// collect 写回 controller。
-func (s *settingsPage) collect() {
+// collect 校验并把设置写回 controller；任一数值字段非法时返回 false 且不写回。
+func (s *settingsPage) collect() bool {
+	if s.keepAlive.Validate() != nil || s.retryMax.Validate() != nil || s.retryTime.Validate() != nil {
+		return false
+	}
 	inst := s.ctrl.Instance()
 	inst.Interface = s.iface.Text
 	inst.UserAgent = s.userAgent.Text
 	inst.KAliveLink = s.kAliveLink.Text
-	inst.KeepAlive = atoiOr(s.keepAlive.Text, defaultKeepAlive)
-	inst.RetryMax = atoiOr(s.retryMax.Text, defaultRetryMax)
-	inst.RetryTime = atoiOr(s.retryTime.Text, defaultRetryTime)
+	inst.KeepAlive, _ = strconv.Atoi(s.keepAlive.Text)
+	inst.RetryMax, _ = strconv.Atoi(s.retryMax.Text)
+	inst.RetryTime, _ = strconv.Atoi(s.retryTime.Text)
 	s.ctrl.UpdateInstance(inst)
+	return true
 }
 
-// atoiOr 把输入框文本转为整数；空串或非法输入回退到 def。
-// 这是空输入的兜底：0 会让 keep_alive/retry_time 违反 engine 校验，启动失败。
-func atoiOr(s string, def int) int {
-	if n, err := strconv.Atoi(s); err == nil {
-		return n
+// validatePositiveInt 校验输入为正整数（>0），对应 engine 的 keep_alive / retry_time。
+func validatePositiveInt(s string) error {
+	if n, err := strconv.Atoi(s); err != nil || n <= 0 {
+		return errors.New("请输入正整数")
 	}
-	return def
+	return nil
+}
+
+// validateNonNegativeInt 校验输入为非负整数（≥0），对应 engine 的 retry_max。
+func validateNonNegativeInt(s string) error {
+	if n, err := strconv.Atoi(s); err != nil || n < 0 {
+		return errors.New("请输入非负整数")
+	}
+	return nil
 }
 
 // settingTitle 返回设置页面标题文案。
