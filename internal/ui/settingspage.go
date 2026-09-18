@@ -88,7 +88,8 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		s.autoStatus,
 	)
 
-	backBtn := widget.NewButton("返回", onBack)
+	backBtn := widget.NewButton("保存并返回", onBack)
+	backBtn.Importance = widget.HighImportance
 	s.root = container.NewBorder(
 		nil,
 		container.NewPadded(backBtn),

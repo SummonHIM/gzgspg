@@ -46,24 +46,24 @@ func newHomePage(ctrl *controller.Controller, onLogin func(), onSettings func())
 
 	topRight := container.NewHBox(layout.NewSpacer(), settingsBtn)
 
-	center := container.NewVBox(
+	// 账号密码垂直居中：上下各一个 Spacer 把输入区夹在中间
+	fields := container.NewVBox(
 		layout.NewSpacer(),
-		container.NewCenter(logo),
-		layout.NewSpacer(),
-	)
-
-	form := container.NewVBox(
 		h.username,
 		h.password,
-		loginBtn,
-		h.status,
+		layout.NewSpacer(),
 	)
 
 	content := container.NewBorder(
-		topRight,
-		nil, nil, nil,
-		container.NewVBox(center, container.NewPadded(form)),
+		container.NewVBox(
+			topRight,
+			container.NewCenter(logo),
+		),
+		container.NewPadded(container.NewVBox(h.status, loginBtn)),
+		nil, nil,
+		container.NewPadded(fields),
 	)
+
 	h.root = content
 	return h
 }

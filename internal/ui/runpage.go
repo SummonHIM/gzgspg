@@ -34,11 +34,19 @@ func newRunPage(onLogout func()) *runPage {
 	logoutBtn := widget.NewButtonWithIcon("登出", theme.LogoutIcon(), onLogout)
 	logoutBtn.Importance = widget.HighImportance
 
+	// 中部：Logo + 状态文字，整组垂直居中
+	center := container.NewVBox(
+		layout.NewSpacer(),
+		container.NewCenter(logoObject()),
+		container.NewCenter(r.state),
+		layout.NewSpacer(),
+	)
+
 	r.root = container.NewBorder(
-		container.NewVBox(layout.NewSpacer(), container.NewCenter(r.state)),
+		nil,
 		container.NewPadded(logoutBtn),
 		nil, nil,
-		nil,
+		center,
 	)
 	return r
 }
