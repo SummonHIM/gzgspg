@@ -1,5 +1,5 @@
 name: gzgspg
-arch: "{{.Env.PKGARCH_DEB}}"
+arch: "{{.Env.PKGARCH}}"
 platform: linux
 version: "{{.Env.PKGVER}}"
 section: net
@@ -18,8 +18,3 @@ contents:
     dst: /usr/share/applications/gzgspg.desktop
   - src: assets/icon.png
     dst: /usr/share/icons/hicolor/256x256/apps/gzgspg.png
-overrides:
-  deb:
-    arch: "{{.Env.PKGARCH_DEB}}"
-  rpm:
-    arch: "{{.Env.PKGARCH_RPM}}"
