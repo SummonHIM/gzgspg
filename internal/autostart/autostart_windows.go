@@ -3,7 +3,9 @@
 package autostart
 
 import (
+	"errors"
 	"os"
+	"syscall"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -46,8 +48,8 @@ func Disable() error {
 	}
 	defer k.Close()
 	err = k.DeleteValue(AppName)
-	if err == registry.ErrNotExist {
-		return nil
+	if err != nil && !errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
+		return err
 	}
-	return err
+	return nil
 }
