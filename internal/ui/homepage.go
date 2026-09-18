@@ -49,7 +49,7 @@ func newHomePage(ctrl *controller.Controller, onLogin func(), onSettings func())
 	// Logo 与账号密码作为一整组垂直居中：上下各一个 Spacer 夹住
 	center := container.NewVBox(
 		layout.NewSpacer(),
-		container.NewCenter(logo),
+		container.NewPadded(logo),
 		h.username,
 		h.password,
 		layout.NewSpacer(),
