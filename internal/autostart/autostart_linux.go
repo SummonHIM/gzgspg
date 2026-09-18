@@ -69,7 +69,8 @@ func targetPath() (string, bool) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, "Exec=") {
-			return strings.TrimPrefix(line, "Exec="), true
+			// 容错 CRLF：去掉行尾回车，否则 Reconcile 每次启动都会误判并重写。
+			return strings.TrimRight(strings.TrimPrefix(line, "Exec="), "\r"), true
 		}
 	}
 	return "", false

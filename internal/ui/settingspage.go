@@ -66,7 +66,9 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		s.autoStatus.SetText("当前平台不支持")
 	} else {
 		s.autostart.SetChecked(prefs.BoolWithFallback("autostart", false))
-		s.autostart.OnChanged = func(on bool) {
+		// 具名处理器，便于回退时临时摘除 OnChanged，避免 SetChecked 再次触发本函数。
+		var onAutostartChanged func(on bool)
+		onAutostartChanged = func(on bool) {
 			prefs.SetBool("autostart", on)
 			var err error
 			if on {
@@ -76,14 +78,19 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 			}
 			if err != nil {
 				s.autoStatus.SetText("设置失败: " + err.Error())
-				// 回退到实际状态，并让 preferences 与实际一致
+				// 回退到实际状态，并让 preferences 与实际一致。
+				// 临时摘除回调，避免 SetChecked 重新进入本函数而清空刚设置的错误提示，
+				// 同时避免重复调用一次 Enable/Disable。
 				actual := autostart.Enabled()
 				prefs.SetBool("autostart", actual)
+				s.autostart.OnChanged = nil
 				s.autostart.SetChecked(actual)
+				s.autostart.OnChanged = onAutostartChanged
 				return
 			}
 			s.autoStatus.SetText("")
 		}
+		s.autostart.OnChanged = onAutostartChanged
 	}
 
 	form := widget.NewForm(
