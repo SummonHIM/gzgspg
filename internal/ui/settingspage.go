@@ -30,6 +30,7 @@ type settingsPage struct {
 	retryMax   *widget.Entry
 	retryTime  *widget.Entry
 	autostart  *widget.Check
+	autoLogin  *widget.Check
 	autoStatus *widget.Label
 
 	root fyne.CanvasObject
@@ -45,9 +46,18 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		retryMax:   widget.NewEntry(),
 		retryTime:  widget.NewEntry(),
 		autostart:  widget.NewCheck("开启", nil),
+		autoLogin:  widget.NewCheck("开启", nil),
 		autoStatus: widget.NewLabel(""),
 	}
 	s.load()
+
+	prefs := fyne.CurrentApp().Preferences()
+
+	// 自动登陆：只存 preferences，OnChanged 即时写入
+	s.autoLogin.SetChecked(prefs.BoolWithFallback("auto_login", false))
+	s.autoLogin.OnChanged = func(on bool) {
+		prefs.SetBool("auto_login", on)
+	}
 
 	// 自启开关
 	if !autostart.Supported() {
@@ -55,8 +65,9 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		s.autostart.SetChecked(false)
 		s.autoStatus.SetText("当前平台不支持")
 	} else {
-		s.autostart.SetChecked(autostart.Enabled())
+		s.autostart.SetChecked(prefs.BoolWithFallback("autostart", false))
 		s.autostart.OnChanged = func(on bool) {
+			prefs.SetBool("autostart", on)
 			var err error
 			if on {
 				err = autostart.Enable()
@@ -65,8 +76,10 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 			}
 			if err != nil {
 				s.autoStatus.SetText("设置失败: " + err.Error())
-				// 回退到实际状态
-				s.autostart.SetChecked(autostart.Enabled())
+				// 回退到实际状态，并让 preferences 与实际一致
+				actual := autostart.Enabled()
+				prefs.SetBool("autostart", actual)
+				s.autostart.SetChecked(actual)
 				return
 			}
 			s.autoStatus.SetText("")
@@ -80,6 +93,7 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		widget.NewFormItem("监测在线链接", s.kAliveLink),
 		widget.NewFormItem("最大重试次数", s.retryMax),
 		widget.NewFormItem("重试间隔 (秒)", s.retryTime),
+		widget.NewFormItem("自动登陆", s.autoLogin),
 		widget.NewFormItem("开机自启", s.autostart),
 	)
 
