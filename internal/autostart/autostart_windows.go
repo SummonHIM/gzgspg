@@ -47,8 +47,8 @@ func writeTarget(path string) error {
 	return k.SetStringValue(AppName, `"`+path+`"`)
 }
 
-// targetPath 返回当前自启项指向的可执行路径；不存在时 ok 为 false。
-func targetPath() (string, bool) {
+// rawTarget 返回当前自启项的原始存储值（不去引号）；不存在时 ok 为 false。
+func rawTarget() (string, bool) {
 	k, err := registry.OpenKey(registry.CURRENT_USER, runKey, registry.QUERY_VALUE)
 	if err != nil {
 		return "", false
@@ -58,11 +58,20 @@ func targetPath() (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	return v, true
+}
+
+// targetPath 返回当前自启项指向的可执行路径（去掉引号）；不存在时 ok 为 false。
+func targetPath() (string, bool) {
+	v, ok := rawTarget()
+	if !ok {
+		return "", false
+	}
 	return strings.Trim(v, `"`), true
 }
 
 // Reconcile 让 OS 自启状态与期望一致：期望开启时确保指向当前 exe，
-// 期望关闭时移除自启项。指向与当前 exe 一致时不写入。
+// 期望关闭时移除自启项。指向与当前 exe 一致且形式正确时不写入。
 func Reconcile(enabled bool) error {
 	if !enabled {
 		return Disable()
@@ -71,7 +80,7 @@ func Reconcile(enabled bool) error {
 	if err != nil {
 		return err
 	}
-	if cur, ok := targetPath(); ok && cur == exe {
+	if raw, ok := rawTarget(); ok && !needsRepair(raw, exe) {
 		return nil
 	}
 	return writeTarget(exe)

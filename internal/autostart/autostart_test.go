@@ -12,6 +12,25 @@ func TestSupportedPlatform(t *testing.T) {
 	}
 }
 
+func TestNeedsRepair(t *testing.T) {
+	cases := []struct {
+		name     string
+		raw, exe string
+		want     bool
+	}{
+		{"quoted space path", `"C:\Program Files\gzgspg.exe"`, `C:\Program Files\gzgspg.exe`, false},
+		{"unquoted space path", `C:\Program Files\gzgspg.exe`, `C:\Program Files\gzgspg.exe`, true},
+		{"quoted no-space path", `"C:\gzgspg.exe"`, `C:\gzgspg.exe`, false},
+		{"unquoted no-space path", `C:\gzgspg.exe`, `C:\gzgspg.exe`, false},
+		{"stale path", `C:\old.exe`, `C:\gzgspg.exe`, true},
+	}
+	for _, tc := range cases {
+		if got := needsRepair(tc.raw, tc.exe); got != tc.want {
+			t.Errorf("needsRepair(%q, %q) = %v, want %v", tc.raw, tc.exe, got, tc.want)
+		}
+	}
+}
+
 func TestEnableDisableRoundTrip(t *testing.T) {
 	if !Supported() {
 		t.Skip("autostart not supported on this platform")

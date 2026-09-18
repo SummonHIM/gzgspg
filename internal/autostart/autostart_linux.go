@@ -62,8 +62,8 @@ X-GNOME-Autostart-enabled=true
 	return os.WriteFile(p, []byte(content), 0o644)
 }
 
-// targetPath 返回 desktop 文件中 Exec= 后的内容；读不到时 ok 为 false。
-func targetPath() (string, bool) {
+// rawTarget 返回 desktop 文件中 Exec= 后的原始内容（不去引号）；读不到时 ok 为 false。
+func rawTarget() (string, bool) {
 	p, err := desktopFilePath()
 	if err != nil {
 		return "", false
@@ -74,13 +74,20 @@ func targetPath() (string, bool) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, "Exec=") {
-			// 容错 CRLF 与引号：去掉行尾回车与包裹引号，保证 Reconcile 相等比较稳定。
-			v := strings.TrimPrefix(line, "Exec=")
-			v = strings.TrimRight(v, "\r")
-			return strings.Trim(v, `"`), true
+			// 容错 CRLF：去掉行尾回车。
+			return strings.TrimRight(strings.TrimPrefix(line, "Exec="), "\r"), true
 		}
 	}
 	return "", false
+}
+
+// targetPath 返回 desktop 文件中 Exec= 后的内容（去掉引号）；读不到时 ok 为 false。
+func targetPath() (string, bool) {
+	v, ok := rawTarget()
+	if !ok {
+		return "", false
+	}
+	return strings.Trim(v, `"`), true
 }
 
 // Reconcile 让 OS 自启状态与期望一致。
@@ -92,7 +99,7 @@ func Reconcile(enabled bool) error {
 	if err != nil {
 		return err
 	}
-	if cur, ok := targetPath(); ok && cur == exe {
+	if raw, ok := rawTarget(); ok && !needsRepair(raw, exe) {
 		return nil
 	}
 	return writeTarget(exe)
