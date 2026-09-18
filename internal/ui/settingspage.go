@@ -73,7 +73,7 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 	}
 
 	form := widget.NewForm(
-		widget.NewFormItem("开机自启", container.NewVBox(s.autostart, s.autoStatus)),
+		widget.NewFormItem("开机自启", s.autostart),
 		widget.NewFormItem("网卡 interface", s.iface),
 		widget.NewFormItem("User-Agent", s.userAgent),
 		widget.NewFormItem("keep_alive (秒)", s.keepAlive),
@@ -82,11 +82,17 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 		widget.NewFormItem("retry_time (秒)", s.retryTime),
 	)
 
+	// 自启状态提示单独放表单底部，避免空标签在勾选框下方占一行高度
+	body := container.NewVBox(
+		form,
+		s.autoStatus,
+	)
+
 	backBtn := widget.NewButton("返回", onBack)
 	s.root = container.NewBorder(
 		container.NewHBox(backBtn),
 		nil, nil, nil,
-		container.NewVScroll(form),
+		container.NewVScroll(body),
 	)
 	return s
 }
