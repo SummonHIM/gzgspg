@@ -2,31 +2,38 @@
 package ui
 
 import (
-	"fmt"
 	"log/slog"
-	"path/filepath"
+	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 
 	"github.com/summonhim/gzgspd/engine"
+	"github.com/summonhim/gzgspg/internal/configdir"
 	"github.com/summonhim/gzgspg/internal/controller"
-	"github.com/summonhim/gzgspg/internal/logwriter"
 )
 
 // Run 启动 GUI，阻塞至退出。
 func Run() error {
 	a := app.NewWithID("top.summonhim.gzgspg")
 
-	logBuf := logwriter.New(1000)
-	logger := slog.New(slog.NewTextHandler(logBuf, &slog.HandlerOptions{
+	logPath, err := configdir.LogPath()
+	if err != nil {
+		return err
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer logFile.Close()
+
+	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	slog.SetDefault(logger)
 
-	cfgPath, err := filepath.Abs("config.json")
+	cfgPath, err := configdir.ConfigPath()
 	if err != nil {
 		return err
 	}
@@ -39,85 +46,96 @@ func Run() error {
 	}
 
 	win := a.NewWindow("广工商校园网登录器")
-	win.Resize(fyne.NewSize(560, 640))
+	win.Resize(fyne.NewSize(420, 640))
 
-	ed := newEditor(ctrl)
-	status := widget.NewLabel("未运行")
-	logs := newLogPanel(logBuf)
+	// 三视图共用一个 Stack，切换时只替换内容
+	stack := container.NewStack()
 
-	var startBtn, stopBtn *widget.Button
-	startBtn = widget.NewButton("启动", func() {
-		ed.collect()
-		if err := ctrl.Save(); err != nil {
-			logger.Error("save config failed", "error", err)
+	// 闭包声明在前、赋值在后，方便视图之间互相引用
+	var (
+		home       *homePage
+		run        *runPage
+		showHome   func()
+		showRun    func()
+		onLogin    func()
+		onSettings func()
+		onLogout   func()
+	)
+
+	showHome = func() {
+		home = newHomePage(ctrl, onLogin, onSettings)
+		stack.Objects = []fyne.CanvasObject{home.root}
+		stack.Refresh()
+	}
+
+	showRun = func() {
+		run = newRunPage(onLogout)
+		stack.Objects = []fyne.CanvasObject{run.root}
+		stack.Refresh()
+	}
+
+	onBackFromSettings := func(s *settingsPage) func() {
+		return func() {
+			// 离开设置页时收集，返回首页即生效
+			s.collect()
+			showHome()
 		}
-		startBtn.Disable()
-		stopBtn.Enable()
-		status.SetText("启动中…")
-		// Start 非阻塞，可直接调用；失败时恢复按钮状态
-		if err := ctrl.Start(); err != nil {
-			status.SetText("启动失败: " + err.Error())
-			startBtn.Enable()
-			stopBtn.Disable()
-		}
-	})
-	stopBtn = widget.NewButton("停止", func() {
-		stopBtn.Disable()
-		status.SetText("停止中…")
-		go func() {
-			ctrl.Stop()
-			fyne.Do(func() {
-				startBtn.Enable()
-				stopBtn.Disable()
-				status.SetText("已停止")
-			})
-		}()
-	})
-	stopBtn.Disable()
+	}
 
-	saveBtn := widget.NewButton("保存", func() {
-		ed.collect()
-		if err := ctrl.Save(); err != nil {
-			status.SetText("保存失败: " + err.Error())
+	showSettings := func() {
+		var s *settingsPage
+		s = newSettingsPage(ctrl, func() { onBackFromSettings(s)() })
+		stack.Objects = []fyne.CanvasObject{s.root}
+		stack.Refresh()
+	}
+
+	onSettings = func() {
+		// 先收集首页输入，避免切换时丢失
+		if home != nil {
+			home.collect()
+		}
+		showSettings()
+	}
+
+	onLogin = func() {
+		if home == nil {
 			return
 		}
-		status.SetText("已保存")
-	})
+		home.collect()
+		home.setStatus("")
+		if err := ctrl.Save(); err != nil {
+			home.setStatus("保存失败: " + err.Error())
+			return
+		}
+		if err := ctrl.Start(); err != nil {
+			home.setStatus("启动失败: " + err.Error())
+			return
+		}
+		showRun()
+	}
+
+	onLogout = func() {
+		go func() {
+			ctrl.Stop()
+			fyne.Do(showHome)
+		}()
+	}
 
 	ctrl.Subscribe(func(ev engine.Event) {
 		fyne.Do(func() {
-			status.SetText(statusText(ev))
+			if run != nil {
+				run.setState(ev.State)
+			}
 		})
 	})
 
-	bottom := container.NewHBox(saveBtn, startBtn, stopBtn)
-	content := container.NewBorder(
-		nil,
-		container.NewVBox(container.NewHBox(status), bottom),
-		nil, nil,
-		container.NewVSplit(ed.root, container.NewBorder(
-			widget.NewLabel("日志"), nil, nil, nil, logs.box,
-		)),
-	)
-	win.SetContent(content)
+	showHome()
 
-	// 关窗只隐藏（托盘继续运行）
-	win.SetCloseIntercept(func() {
-		win.Hide()
-	})
+	win.SetContent(stack)
+	win.SetCloseIntercept(func() { win.Hide() })
 
-	setupTray(a, win, ctrl, status, startBtn, stopBtn)
+	setupTray(a, win, ctrl)
 
 	win.ShowAndRun()
 	return nil
-}
-
-func statusText(ev engine.Event) string {
-	if ev.Err != nil {
-		return fmt.Sprintf("%s: %v", ev.State.String(), ev.Err)
-	}
-	if ev.Message != "" {
-		return fmt.Sprintf("%s - %s", ev.State.String(), ev.Message)
-	}
-	return ev.State.String()
 }
