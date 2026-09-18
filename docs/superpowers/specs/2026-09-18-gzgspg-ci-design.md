@@ -108,8 +108,10 @@ WiX 官方对 per-user / per-machine 的推荐做法就是**两个安装包**：
 
 | 包名 | 安装位置 | 属性 |
 |------|----------|------|
-| `gzgspg-<ver>-windows-<arch>-system.msi` | `ProgramFiles64Folder\gzgspg` | `ALLUSERS=1`，需要管理员 |
-| `gzgspg-<ver>-windows-<arch>-user.msi` | `LocalAppDataFolder\gzgspg` | `ALLUSERS=2` + `MSIINSTALLPERUSER=1`，免管理员 |
+| `gzgspg-<ver>-windows-<arch>-system.msi` | `ProgramFiles64Folder\gzgspg`（386 用 `ProgramFilesFolder`） | `Scope="perMachine"`，需要管理员 |
+| `gzgspg-<ver>-windows-<arch>-user.msi` | `LocalAppDataFolder\gzgspg` | `Scope="perUser"`，免管理员 |
+
+scope 用 WiX v4 的 `<Package Scope>` 枚举属性表达，由它推导 `ALLUSERS` / `MSIINSTALLPERUSER`，不手写这两个属性。
 
 其中 MSI 内部 `Version` 用四段数字 `1.3.0.0`，文件名仍用 `1.3.0`。
 
