@@ -13,7 +13,7 @@
 | 决策 | 选择 |
 |------|------|
 | 形态 | 托盘常驻 + 主窗口（关窗隐藏，托盘退出才退出） |
-| GUI 框架 | Fyne（纯 Go，跨平台） |
+| GUI 框架 | Fyne v2.8.1（纯 Go，跨平台） |
 | 目标平台 | Windows、Linux、macOS |
 | 运行模型 | GUI 进程内跑 engine，不依赖外部 gzgspd 进程/服务 |
 | engine 依赖方式 | `go.work` 工作区，指向平级目录的 gzgspd |
@@ -124,7 +124,30 @@ config.json ──LoadConfig──→ controller ──engine.New──→ Engin
 
 **托盘**：图标 + 右键菜单「显示主窗口 / 启动 / 停止 / 退出」。关闭主窗口只隐藏，托盘「退出」才真正结束进程。
 
-**线程约束**：Fyne 要求所有 UI 更新在主线程，controller 的事件回调一律经 `fyne.Do()` 投递。
+托盘 API 实测（Fyne v2.8.1）：
+
+```go
+import "fyne.io/fyne/v2/driver/desktop"
+
+d, ok := a.(desktop.App)   // a 为 fyne.App
+if ok {
+    d.SetSystemTrayWindow(win)      // 必须先设，否则某些平台关窗即退出
+    d.SetSystemTrayIcon(iconRes)
+    d.SetSystemTrayMenu(fyne.NewMenu("gzgspg",
+        fyne.NewMenuItem("显示主窗口", func() { win.Show() }),
+        fyne.NewMenuItem("启动", func() { /* ... */ }),
+        fyne.NewMenuItem("停止", func() { /* ... */ }),
+        fyne.NewMenuItemSeparator(),
+        fyne.NewMenuItem("退出", func() { a.Quit() }),
+    ))
+}
+```
+
+- `SetSystemTrayMenu` / `SetSystemTrayIcon` / `SetSystemTrayWindow` 不在 `fyne.App` 接口上，需断言 `desktop.App`。
+- `SetSystemTrayWindow` 必须调用，它同时承担「托盘驱动生命周期」的职责。
+- `Window.SetCloseIntercept` 用于把关闭动作改为隐藏。
+
+**线程约束**：Fyne 要求所有 UI 更新在主线程，controller 的事件回调一律经 `fyne.Do()` 投递（v2.6+ 提供，v2.8.1 已确认存在）。
 
 ## 配置读写
 
