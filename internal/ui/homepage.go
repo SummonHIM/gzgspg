@@ -11,6 +11,9 @@ import (
 	"github.com/summonhim/gzgspg/internal/controller"
 )
 
+// titleSize 是首页标题的字号，与运行页状态文字保持同一视觉量级。
+const titleSize float32 = 28
+
 // homePage 是登录首页：居中 Logo + 账号 + 密码 + 登陆按钮 + 右上角设置图标。
 type homePage struct {
 	ctrl     *controller.Controller
@@ -76,8 +79,14 @@ func logoObject() fyne.CanvasObject {
 }
 
 // appTitle 返回界面标题文案，与窗口标题、FyneApp.toml 中的发布名一致。
+// 用 canvas.Text 才能直接指定字号（widget.Label 需自定义 Theme）。
 func appTitle() fyne.CanvasObject {
-	return widget.NewLabelWithStyle("广工商校园网登录器", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	return &canvas.Text{
+		Text:      "广工商校园网登录器",
+		TextSize:  titleSize,
+		TextStyle: fyne.TextStyle{Bold: true},
+		Alignment: fyne.TextAlignCenter,
+	}
 }
 
 // collect 把首页字段写回 controller。
