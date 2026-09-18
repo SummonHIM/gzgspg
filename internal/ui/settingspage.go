@@ -10,6 +10,7 @@ import (
 
 	"github.com/summonhim/gzgspg/internal/autostart"
 	"github.com/summonhim/gzgspg/internal/controller"
+	"github.com/summonhim/gzgspg/internal/version"
 )
 
 // 数值字段的兜底默认值，仅在输入框为空或内容非法时使用。
@@ -108,6 +109,8 @@ func newSettingsPage(ctrl *controller.Controller, onBack func()) *settingsPage {
 	body := container.NewVBox(
 		form,
 		s.autoStatus,
+		widget.NewSeparator(),
+		widget.NewLabel(versionLabel()),
 	)
 
 	backBtn := widget.NewButton("保存并返回", onBack)
@@ -163,4 +166,9 @@ func settingTitle() fyne.CanvasObject {
 		TextStyle: fyne.TextStyle{Bold: true},
 		Alignment: fyne.TextAlignCenter,
 	}
+}
+
+// versionLabel 返回设置页底部展示的版本文案。
+func versionLabel() string {
+	return "版本 " + version.String()
 }
