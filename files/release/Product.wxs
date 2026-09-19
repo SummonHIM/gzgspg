@@ -21,7 +21,12 @@
                       Directory="ProgramMenuDir"
                       Name="广工商校园网登录器"
                       WorkingDirectory="INSTALLFOLDER"
-                      Advertise="yes" />
+                      Advertise="no" />
+            <Shortcut Id="DesktopShortcut"
+                      Directory="DesktopFolder"
+                      Name="广工商校园网登录器"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Advertise="no" />
           </File>
         </Component>
       </Directory>
@@ -30,6 +35,12 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ProgramMenuDir" Name="广工商校园网登录器" />
     </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="MainFeature" Title="广工商校园网登录器" Level="1">
+      <ComponentRef Id="MainExecutable" />
+    </Feature>
 
   </Package>
 </Wix>
