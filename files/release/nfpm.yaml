@@ -1,7 +1,7 @@
 name: gzgspg
-arch: "{{.Env.PKGARCH}}"
+arch: "${PKGARCH}"
 platform: linux
-version: "{{.Env.PKGVER}}"
+version: "${PKGVER}"
 section: net
 priority: optional
 maintainer: SummonHIM <summonhim@summonhim.top>
