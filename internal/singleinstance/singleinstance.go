@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -94,6 +95,7 @@ func (p *Primary) serve() {
 			return // listener 被 Release 关闭
 		}
 		buf := make([]byte, 1)
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 		if _, err := conn.Read(buf); err == nil {
 			select {
 			case p.activations <- struct{}{}:
@@ -116,7 +118,7 @@ func readPort(dir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(string(data))
+	return strconv.Atoi(strings.TrimSpace(string(data)))
 }
 
 func portPath(dir string) string {

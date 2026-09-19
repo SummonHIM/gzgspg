@@ -94,6 +94,17 @@ func TestSignalExistingRetriesUntilPortAvailable(t *testing.T) {
 	}
 }
 
+func TestReleaseIsSafeToCallTwice(t *testing.T) {
+	dir := t.TempDir()
+
+	p, err := Acquire(dir)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	p.Release()
+	p.Release() // 第二次释放不应 panic
+}
+
 func TestPortFileRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
