@@ -103,7 +103,7 @@ jobs:
           # windows-latest 自带的 mingw 只有 x86_64，编不了 386/arm64；用包的 mstorsjo llvm-mingw 一套覆盖三个架构。
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-          scoop install mingw-mstorsjo-llvm-ucrt
+          scoop install mingw-mstorsjo-llvm-ucrt@23.1.1-20260908
           "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append
           "$env:USERPROFILE\scoop\apps\mingw-mstorsjo-llvm-ucrt\current\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
@@ -112,7 +112,7 @@ jobs:
         shell: bash
         run: |
           set -xeuo pipefail
-          go install github.com/akavel/rsrc@latest
+          go install github.com/akavel/rsrc@v0.10.2
           "$(go env GOPATH)/bin/rsrc" -arch ${{ matrix.jobs.goarch }} -ico assets/icon.ico -o rsrc.syso
 
       - name: Build binary
@@ -146,7 +146,7 @@ jobs:
             # GUI 应用：不挂控制台子系统，避免双击时弹出黑框
             LD_FLAGS="-H=windowsgui ${LD_FLAGS}"
           fi
-          go build -v -trimpath -ldflags "${LD_FLAGS}" -o "${BIN}"
+          go build -trimpath -ldflags "${LD_FLAGS}" -o "${BIN}"
 
           if [ "${{ matrix.jobs.goos }}" = "windows" ]; then
             cp "${BIN}" "dist/gzgspg-windows-${{ matrix.jobs.output }}.exe"
@@ -162,12 +162,13 @@ jobs:
         shell: bash
         run: |
           set -xeuo pipefail
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
           NFPM="$(go env GOPATH)/bin/nfpm"
 
-          # nfpm 的 arch 是顶层字段，不支持 per-format 覆盖，故每种格式各注入一次 PKGARCH
-          PKGARCH="${PKGARCH_DEB}" "$NFPM" package -f files/release/nfpm.yaml -p deb -t dist/
-          PKGARCH="${PKGARCH_RPM}" "$NFPM" package -f files/release/nfpm.yaml -p rpm -t dist/
+          # nfpm 的 arch 是顶层字段，不支持 per-format 覆盖，故每种格式各注入一次 PKGARCH；
+          # nfpm 无 file_name_template，用 -t 直接指定产物文件名。
+          PKGARCH="${PKGARCH_DEB}" "$NFPM" package -f files/release/nfpm.yaml -p deb -t "dist/gzgspg-linux-${PKGARCH_DEB}-${PKGVER}.deb"
+          PKGARCH="${PKGARCH_RPM}" "$NFPM" package -f files/release/nfpm.yaml -p rpm -t "dist/gzgspg-linux-${PKGARCH_RPM}-${PKGVER}.rpm"
 
       - name: Package AppImage
         if: matrix.jobs.goos == 'linux' && matrix.jobs.output == 'amd64'
@@ -178,35 +179,7 @@ jobs:
             -v "$PWD:/work" -w /work \
             -e VERSION="${VERSION}" \
             ubuntu:22.04 \
-            bash -c '
-              set -xeuo pipefail
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update
-              apt-get install -y curl file fuse libfuse2 desktop-file-utils \
-                libgtk-3-0 libgtk-3-bin libayatana-appindicator3-1 \
-                libgl1 libglx-mesa0 libegl1 libgles2 \
-                dpkg-dev pkg-config libglib2.0-bin libgdk-pixbuf2.0-bin imagemagick
-              # linuxdeploy 要求正方形且尺寸合规的图标；源图 319x320，先补成正方形再缩到 256。
-              mkdir -p /tmp/icon
-              convert assets/icon.png -background none -gravity center -extent 320x320 -resize 256x256 /tmp/icon/gzgspg.png
-              curl -fsSL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-              # plugin-gtk 没有 release 资源（404），且 linuxdeploy 只按 linuxdeploy-plugin-gtk 这个名字在 PATH 里找插件。
-              curl -fsSL -o linuxdeploy-plugin-gtk https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
-              chmod +x linuxdeploy linuxdeploy-plugin-gtk
-              export PATH="$PWD:$PATH"
-              export ARCH=x86_64
-              export DEPLOY_GTK_VERSION=3
-              export LINUXDEPLOY_OUTPUT_VERSION="${VERSION}"
-              # 容器内没有 fuse，让 AppImage 自解压运行
-              export APPIMAGE_EXTRACT_AND_RUN=1
-              ./linuxdeploy --appdir AppDir \
-                --desktop-file files/release/gzgspg.desktop \
-                --icon-file /tmp/icon/gzgspg.png \
-                --executable gzgspg \
-                --plugin gtk \
-                --output appimage
-              mv gzgspg*.AppImage "dist/gzgspg-linux-amd64-${VERSION}.AppImage"
-            '
+            bash files/release/build-appimage.sh
 
       - name: Install WiX
         if: matrix.jobs.goos == 'windows'
@@ -227,36 +200,7 @@ jobs:
       - name: Package macOS app
         if: matrix.jobs.goos == 'darwin'
         shell: bash
-        run: |
-          set -xeuo pipefail
-          APP="dist/gzgspg.app"
-          rm -rf "$APP"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-
-          cp "${BIN}" "$APP/Contents/MacOS/gzgspg"
-          chmod +x "$APP/Contents/MacOS/gzgspg"
-
-          sed "s/@@VERSION@@/${VERSION}/" files/release/Info.plist > "$APP/Contents/Info.plist"
-
-          # icon.png -> icon.icns
-          ICONSET="$(mktemp -d)/gzgspg.iconset"
-          mkdir -p "$ICONSET"
-          for s in 16 32 64 128 256 512; do
-            sips -z $s $s assets/icon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-            d=$((s * 2))
-            sips -z $d $d assets/icon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
-          done
-          iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/gzgspg.icns"
-
-          (cd dist && zip -r "gzgspg-macos-${{ matrix.jobs.output }}-${VERSION}.zip" "gzgspg.app")
-
-          # dmg：app + Applications 软链
-          STAGE="$(mktemp -d)/dmg"
-          mkdir -p "$STAGE"
-          cp -R "$APP" "$STAGE/"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "gzgspg" -srcfolder "$STAGE" -ov -format UDZO \
-            "dist/gzgspg-macos-${{ matrix.jobs.output }}-${VERSION}.dmg"
+        run: bash files/release/build-macos.sh "${VERSION}" "${{ matrix.jobs.output }}"
 
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
