@@ -30,6 +30,18 @@
 
 首次运行会自动生成一份带默认值的 `config.json`。
 
+## 卸载与自启残留清理
+
+开机自启项由应用运行时按开关写入（`HKCU\...\Run` / `~/.config/autostart` /
+LaunchAgent），不属于安装包文件，卸载时可能残留。残留项指向已删除的可执行文件，
+开机时只会静默失败、无害。
+
+- **Windows**：`.msi` 卸载时已自动清理自启项。若使用 `.exe` / `.zip` 手动部署，
+  可先关闭应用内的「开机自启」开关，或手动删除注册表值
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 下的 `gzgspg`。
+- **macOS**：删除 `~/Library/LaunchAgents/top.summonhim.gzgspg.plist`。
+- **Linux**：删除 `~/.config/autostart/gzgspg.desktop`。
+
 ## 本地构建
 
 ```bash
