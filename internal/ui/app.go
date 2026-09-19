@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/summonhim/gzgspg/internal/autostart"
 	"github.com/summonhim/gzgspg/internal/configdir"
 	"github.com/summonhim/gzgspg/internal/controller"
+	"github.com/summonhim/gzgspg/internal/singleinstance"
 )
 
 // quitPause 是退出时用于让人看见「正在登出」的停顿。
@@ -22,6 +24,20 @@ const quitPause = 600 * time.Millisecond
 // Run 启动 GUI，阻塞至退出。
 func Run() error {
 	a := app.NewWithID("top.summonhim.gzgspg")
+
+	dir, err := configdir.Dir()
+	if err != nil {
+		return err
+	}
+	primary, err := singleinstance.Acquire(dir)
+	if err != nil {
+		if errors.Is(err, singleinstance.ErrAlreadyRunning) {
+			// 已有实例在运行：激活信号已发出，静默退出
+			return nil
+		}
+		return err
+	}
+	defer primary.Release()
 
 	logPath, err := configdir.LogPath()
 	if err != nil {
@@ -204,6 +220,12 @@ func Run() error {
 			login()
 		}
 	}
+
+	go func() {
+		for range primary.Activations() {
+			fyne.Do(func() { win.Show(); win.RequestFocus() })
+		}
+	}()
 
 	win.ShowAndRun()
 	return nil
