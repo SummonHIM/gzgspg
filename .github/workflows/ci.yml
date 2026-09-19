@@ -60,8 +60,10 @@ jobs:
           - { goos: windows, goarch: amd64, output: amd64, runs-on: windows-latest, win: true }
           - { goos: windows, goarch: arm64, output: arm64, runs-on: windows-latest, win: true }
 
-          - { goos: darwin, goarch: amd64, output: amd64, runs-on: macos-14, mac: true }
-          - { goos: darwin, goarch: arm64, output: arm64, runs-on: macos-14, mac: true }
+          # macos-13 已下线、macos-14 已 deprecated；免费标准 runner 仅剩 arm64，
+          # 故 arm64 走原生 macos-15，amd64 在 arm64 上 CGO 交叉编译。
+          - { goos: darwin, goarch: amd64, output: amd64, runs-on: macos-15, mac: true }
+          - { goos: darwin, goarch: arm64, output: arm64, runs-on: macos-15, mac: true }
 
     steps:
       - name: Checkout repositories
